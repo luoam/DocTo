@@ -60,7 +60,7 @@ parameters and values need to be seperated by a ' ' space.
       --ignorelongrunninglist
   -G  Write Log to file in directory
       --writelogfile
-  -GL Log File Name to Use. Default 'DocTo.Log';
+  -GL Log File Name to Use. Default 'DocTo.Log'; Also swiches on -G
       --logfilename
   -Q  Quiet Mode: Nothing will be output to console.  To see any errors you must
       set -G or -GL. Equivalent to setting -L 0
