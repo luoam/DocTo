@@ -11,7 +11,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEAL
 ****************************************************************)
 interface
 uses  classes, Windows, sysutils, ActiveX, ComObj, WinINet, Variants,
-      Types,  ResourceUtils,
+      Types,  ResourceUtils, Word_TLB_Constants,
       PathUtils, ShellAPI, datamodssl;
 
 Const
@@ -27,7 +27,7 @@ Const
   MSWORD = 1;
   MSEXCEL = 2;
 
-  DOCTO_VERSION = '1.1.25.46';
+  DOCTO_VERSION = '1.1.26.47';
 
 type
 
@@ -35,7 +35,7 @@ type
   TConsoleLog = class
   public
     procedure Log(Sender: TObject; Log : String);
-    procedure LogError(Log: String);
+
   end;
 
   TConversionInfo =  Record
@@ -76,6 +76,7 @@ type
     FOutputFileFormatString: String;
     FOutputFileFormat: Integer;
     FOutputLog: Boolean;
+    FLogQuiet : Boolean;
     FOutputFile: String;
     FInputFile: String;
     FOutputLogFile: String;
@@ -102,9 +103,6 @@ type
     FRemoveFileOnConvert: boolean;
 
     FIgnoreErrorDocsFile : TStringList;
-
-
-
 
     FOutputIsFile: Boolean;
     FOutputIsDir: Boolean;
@@ -411,6 +409,8 @@ While iParam <= Params.Count -1 do
     end
     else if id  = '-Q' then
     begin
+      FLogQuiet := true;
+      Loglevel := Silent;
       OutputLog := false;
     end ;
 
@@ -446,6 +446,7 @@ begin
   FLogLevel := STANDARD;
   FLogtoFile := false;
   FLogFilename := 'DocTo.Log';
+  FLogQuiet := false;
   FRemoveFileOnConvert := false;
   FWebHook := '';
   FOutputExt := '';
@@ -459,7 +460,7 @@ begin
   fSkipDocsWithTOC := false;
   fSkipDocsExist :=  false;
   FFirstLogEntry := true;
-  FBookMarkSource := 1; //wdExportCreateHeadingBookmarks
+  FBookMarkSource := wdExportCreateHeadingBookmarks;
   fPDFOpenAfterExport := false;
 
   FInputFiles := TStringList.Create;
@@ -800,7 +801,8 @@ begin
 
   HaltOnWordError := true;
 
-  log('Loading Configuration...',VERBOSE);
+  log('[' + FormatDateTime('YYYYMMDD HH:NN:SS -' , now) +  ']:Loading Configuration...',STANDARD);
+
   log('Parameter Count is ' + inttostr(params.Count), VERBOSE);
 
   if Params.Count = 0 then
@@ -951,13 +953,14 @@ begin
     else if (id  = '-Q') or
             (id = '--QUIET') then
     begin
-
       OutputLog := false;
       // Doesn't require a value
       dec(iParam);
     end
-    else if (id = '-T') or (id = '-TF') or
-            (id = '--FORMAT') or (id = '--FORCEFORMAT') then
+    else if (id = '-T') or
+            (id = '-TF') or
+            (id = '--FORMAT') or
+            (id = '--FORCEFORMAT') then
     begin
 
       if IsNumber(value) then
@@ -977,7 +980,6 @@ begin
         if  idx > -1 then
         begin
           OutputFileFormat := strtoint(formats.Values[OutputFileFormatString]);
-
         end
         else if idx = -1 then
         begin
@@ -985,7 +987,7 @@ begin
 
         end;
       end;
-      log('Type Integer is: ' + inttostr(FOutputFileFormat), VERBOSE);
+      log('Format Type: ' + inttostr(FOutputFileFormat), VERBOSE);
 
     end
     else if (id = '-C') or
@@ -1007,6 +1009,7 @@ begin
     else if (id = '-GL') or
             (id = '--LOGFILENAME') then
     begin
+       LogToFile := true;
        FLogFilename := value;
        LogToFile := true;
     end
@@ -1111,19 +1114,17 @@ begin
       log('');
       log('FILE FORMATS', Formats, Help);
 
-      // Log after TODO done
-      //LogHelp('HELPJSON');
       halt(2);
     end
-    else if (id = '--HELP-EXCEL') then
+    else if (id = '--HELP-EXCEL') or
+            (id = '-HXL')then
     begin
       LogHelp('EXCELFORMATS');
       halt(2);
     end
     else if (id = '-HJ') then
     begin
-    log( 'hJ');
-    LogHelp('HELPJSON');
+      LogHelp('HELPJSON');
       halt(2);
     end
     else if (id = '-HW') then
@@ -1190,6 +1191,7 @@ begin
   if FFirstLogEntry then
   begin
     OutputTimeStamp := true;
+
   end;
 
   if Level = HELP then
@@ -1198,22 +1200,15 @@ begin
       OutputTimeStamp := false;
   end;
 
-  if OutputTimeStamp then
-  begin
-    FFirstLogEntry := false;
-    Msg := '[' + FormatDateTime('YYYYMMDD HH:NN:SS -' , now) +  ']: '  +  Msg;
-  end;
-
-
   if OutputLog = true then
   begin
     ConsoleLog.Log(self, Msg);
-  end;
 
-  if FLogtoFile then
-  begin
-    FLogFile.Add(Msg);
-    FLogFile.SaveToFile(FLogFilename);
+    if FLogtoFile then
+    begin
+      FLogFile.Add(Msg);
+      FLogFile.SaveToFile(FLogFilename);
+    end;
   end;
 
 end;
@@ -1257,9 +1252,6 @@ end;
 
 procedure TDocumentConverter.LogVersionInfo;
 begin
-      // Prevent Date from Printing.
-      FFirstLogEntry := false;
-
       // Log versions.
       log('DocTo Version:' + DOCTO_VERSION);
       log('OfficeApp Version:' +  OfficeAppVersion(),0);
@@ -1474,42 +1466,42 @@ begin
 end;
 
 procedure TDocumentConverter.ListFiles(const PathName, FileName : string; const InDir : boolean; outFiles: TStrings);
-var Rec  : TSearchRec;
+var Match  : TSearchRec;
     Path : string;
 begin
 Path := IncludeTrailingBackslash(PathName);
-if FindFirst(Path + FileName, faAnyFile - faDirectory, Rec) = 0 then
+if FindFirst(Path + FileName, faAnyFile - faDirectory, Match) = 0 then
+begin
  try
    repeat
-     outFiles.Add(Path + Rec.Name);
-   until FindNext(Rec) <> 0;
+     outFiles.Add(Path + Match.Name);
+   until FindNext(Match) <> 0;
  finally
-   FindClose(Rec);
+   FindClose(Match);
  end;
+end;
 
 If not InDir then Exit;
 
-if FindFirst(Path + '*.*', faDirectory, Rec) = 0 then
+if FindFirst(Path + '*.*', faDirectory, Match) = 0 then
+begin
  try
    repeat
 
-     if ((Rec.Attr and faDirectory) <> 0)  and (Rec.Name<>'.') and (Rec.Name<>'..') then
+     if ((Match.Attr and faDirectory) <> 0)  and (Match.Name<>'.') and (Match.Name<>'..') then
      BEGIN
-      if AllowDirectory(Rec.Name, Path + Rec.Name) then
+      // Some directories are to be excluded based on parameters.
+      if AllowDirectory(Match.Name, Path + Match.Name) then
       begin
-       ListFiles(Path + Rec.Name, FileName, True, outFiles);
+       ListFiles(Path + Match.Name, FileName, True, outFiles);
       end;
      end;
 
-   until FindNext(Rec) <> 0;
+   until FindNext(Match) <> 0;
  finally
-   FindClose(Rec);
+   FindClose(Match);
  end;
-end; //procedure FileSearch
-
-procedure TConsoleLog.LogError(Log: String);
-begin
-
+end;
 end;
 
 
@@ -1532,6 +1524,7 @@ begin
   begin
       UrlHandle := InternetOpenUrl(FNetHandle, PChar(Url), nil, 0, INTERNET_FLAG_RELOAD, 0);
       if Assigned(UrlHandle) then
+      begin
         try
           repeat
             InternetReadFile(UrlHandle, @Buffer, SizeOf(Buffer), BytesRead);
@@ -1541,6 +1534,7 @@ begin
         finally
           InternetCloseHandle(UrlHandle);
         end
+      end
       else
       begin
         raise Exception.CreateFmt('Cannot open URL: %s', [Url]);
@@ -1574,15 +1568,18 @@ function TDocumentConverter.AllowDirectory(DirName, FullPath: String): Boolean;
 begin
     Result := true;
     if (Ignore_MACOSX) then
+    begin
       if (DirName = '__MACOSX') then
       BEGIN
         Result := false;
       END;
+    end;
 end;
 
 function TDocumentConverter.AllowFile(FileName, Fullpath: String): Boolean;
 begin
-
+  // Currently no checks are carried out.
+  Result := true;
 end;
 
 end.
