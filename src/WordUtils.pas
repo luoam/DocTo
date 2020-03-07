@@ -86,6 +86,8 @@ begin
   inherited;
   InputExtension := '.doc*';
   LogFilename := 'DocTo.Log';
+  FOfficeAppID := MSWORD;
+  fofficeAppTitle := 'WORD';
 end;
 
 function TWordDocConverter.CreateOfficeApp: boolean;

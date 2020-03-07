@@ -59,6 +59,7 @@ type
     FNetHandle: HINTERNET;
 
 
+
     procedure SetCompatibilityMode(const Value: Integer);
     procedure SetIgnore_MACOSX(const Value: boolean);
     procedure SetEncoding(const Value: Integer);
@@ -102,6 +103,8 @@ type
     FRemoveFileOnConvert: boolean;
 
     FIgnoreErrorDocsFile : TStringList;
+    FOfficeAppTitle: String;
+    FOfficeAppID: Integer;
 
 
 
@@ -146,7 +149,8 @@ type
     property List_ErrorDocs_Seconds : Integer read FList_ErrorDocs_Seconds write SetList_ErrorDocs_Seconds ;
     property Ignore_ErrorDocs : Boolean read FIgnore_ErrorDocs write SetIgnore_ErrorDocs;
     property pdfOpenAfterExport: Boolean read FPDFOpenAfterExport write SetpdfOpenAfterExport;
-
+    property OfficeAppTitle : String Read FOfficeAppTitle;
+    Property OfficeAppID : Integer Read FOfficeAppID;
 
     procedure SetExtension(const Value: String); virtual;
     function GetExtension: String;  virtual;
